@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Poseidon Web Controller</title>
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+    <header class="top-bar">
+        <div class="brand">
+            <h1>Poseidon Web Controller</h1>
+            <p>通过浏览器/手机操控树莓派上的注射泵。</p>
+        </div>
+        <div class="status-group">
+            <span id="connection-status" class="status-pill status-disconnected">未连接</span>
+            <div id="board-status" class="board-status"></div>
+        </div>
+    </header>
+
+    <main>
+        <section class="panel">
+            <header class="panel-header">
+                <h2>串口连接</h2>
+                <div class="panel-actions">
+                    <button id="refresh-ports" class="btn">刷新串口</button>
+                    <button id="close-all" class="btn">全部断开</button>
+                </div>
+            </header>
+            <div class="panel-body board-grid">
+                <div class="board-card">
+                    <h3>主板 (P1/P2)</h3>
+                    <label class="field">
+                        <span>串口</span>
+                        <select id="port-select-0"></select>
+                    </label>
+                    <label class="field">
+                        <span>波特率</span>
+                        <select id="baud-select-0">
+                            <option value="230400">230400</option>
+                            <option value="115200">115200</option>
+                            <option value="250000">250000</option>
+                        </select>
+                    </label>
+                    <button id="connect-board-0" class="btn btn-primary">连接主板</button>
+                </div>
+                <div class="board-card">
+                    <h3>副板 (P3/P4)</h3>
+                    <label class="field">
+                        <span>串口</span>
+                        <select id="port-select-1"></select>
+                    </label>
+                    <label class="field">
+                        <span>波特率</span>
+                        <select id="baud-select-1">
+                            <option value="230400">230400</option>
+                            <option value="115200">115200</option>
+                            <option value="250000">250000</option>
+                        </select>
+                    </label>
+                    <button id="connect-board-1" class="btn btn-primary">连接副板</button>
+                </div>
+            </div>
+            <footer class="panel-footer">
+                <button id="zero-all" class="btn">两板置零</button>
+                <button id="estop" class="btn btn-danger">紧急停止</button>
+            </footer>
+        </section>
+
+        <section class="panel">
+            <header class="panel-header">
+                <h2>泵控制</h2>
+                <span id="ack-summary" class="ack-summary"></span>
+            </header>
+            <div id="pump-grid" class="pump-grid"></div>
+        </section>
+
+        <section class="panel">
+            <header class="panel-header">
+                <h2>注射器库</h2>
+                <div class="panel-actions">
+                    <button id="add-syringe" class="btn">新增注射器</button>
+                    <button id="save-syringes" class="btn btn-primary">保存</button>
+                </div>
+            </header>
+            <div class="panel-body">
+                <div class="table-responsive">
+                    <table class="syringe-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 55%;">名称</th>
+                                <th style="width: 25%;">内径 (mm)</th>
+                                <th style="width: 20%;">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="syringe-table-body"></tbody>
+                    </table>
+                </div>
+                <p class="hint">体积换算时使用列表的第一项，可通过上下移动按钮调整顺序。</p>
+            </div>
+        </section>
+    </main>
+
+    <div id="toast-container"></div>
+    <script type="module" src="/static/app.js"></script>
+</body>
+</html>

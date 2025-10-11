@@ -61,6 +61,20 @@ The Python scripts are available in the `SOFTWARE/` folder. The GUI was created 
 
 The software you will need to run on your computer in order to control the Arduino is the `poseidon_main.py` script located in the `SOFTWARE/` folder (also included is `poseidon_controller_gui.py` which is needed). 
 
+### Web 控制界面（Beta）
+我们新增了一个适合手机/浏览器使用的 Web 控制界面，默认运行在树莓派上：
+
+1. 在树莓派上安装依赖并启动接口：
+   ```bash
+   cd SOFTWARE/WebController
+   python -m pip install -r requirements.txt
+   uvicorn SOFTWARE.WebController.server:app --host 0.0.0.0 --port 8000
+   ```
+2. 将手机或其他终端连接到同一局域网，使用浏览器访问 `http://树莓派IP:8000/` 即可进行泵的控制、参数校准与注射器库管理。
+3. 若需要开机自启，可使用 `systemd` 或 `pm2` 等方式守护 `uvicorn` 服务。
+
+> 提示：Web 端的体积/速度换算仍依赖 `~/.poseidon_touch/` 下的校准数据，与原有 Qt GUI 共享设置。
+
 You have the option of either (1) running from the source code in Python or (2) choosing the appropriate binary file below for your operating system and executing it. Before you run the controller code, MAKE SURE YOU HAVE INSTALLED THE ARDUINO FIRMWARE!!
 
 ## Startup Checklist
