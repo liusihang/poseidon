@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import os
+import logging
+from inspect import iscoroutinefunction
 from pathlib import Path
 from typing import List, Optional
 
@@ -12,33 +15,91 @@ from pydantic import BaseModel, Field, validator
 from .hotspot import ensure_hotspot_async
 from .service import DEFAULT_BAUD, service
 
+# -----------------------------------------------------------------------------
+# App & logging
+# -----------------------------------------------------------------------------
+logger = logging.getLogger("poseidon.web")
+logging.basicConfig(level=os.getenv("POSEIDON_LOGLEVEL", "INFO"))
+
 app = FastAPI(title="Poseidon Web Controller", version="1.0.0")
 
+# -----------------------------------------------------------------------------
+# Static assets
+# -----------------------------------------------------------------------------
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 if STATIC_DIR.exists():
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 INDEX_HTML = STATIC_DIR / "index.html"
 
-# Allow same-network devices (e.g., phones) to call the API via browser
+# -----------------------------------------------------------------------------
+# CORS (allow same-network access from browsers)
+# -----------------------------------------------------------------------------
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"],          # 在内网测试阶段放开；若对外请收紧白名单
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Ensure hotspot is up for mobile clients (best-effort).
-ensure_hotspot_async(ssid="ShuofangLab_Pump", password="")
+
+# -----------------------------------------------------------------------------
+# Optional hotspot creation on startup (controlled by env)
+#   PUMP_ENABLE_AP=1            -> enable hotspot
+#   PUMP_AP_SSID=<ssid>         -> optional SSID (default: ShuofangLab_Pump)
+#   PUMP_AP_PASSWORD=<pass>     -> WPA2 8–63 chars; if missing, auto-generate
+#   PUMP_AP_IFNAME=wlan0        -> choose interface (default: wlan0)
+# -----------------------------------------------------------------------------
+@app.on_event("startup")
+async def _startup() -> None:
+    # 允许其它初始化逻辑在此处加入；出现异常只告警不终止
+    try:
+        logger.info("Poseidon Web Controller starting up.")
+    except Exception as e:
+        logger.warning("Non-fatal init warning: %s", e)
+
+    enable_ap = os.getenv("PUMP_ENABLE_AP", "0").lower() in ("1", "true", "yes", "on")
+    if not enable_ap:
+        logger.info("Hotspot creation skipped (PUMP_ENABLE_AP not set).")
+        return
+
+    ssid = os.getenv("PUMP_AP_SSID", "ShuofangLab_Pump")
+    ifname = os.getenv("PUMP_AP_IFNAME", "wlan0")
+    password = os.getenv("PUMP_AP_PASSWORD", "")
+
+    # 确保密码合规；为空或长度不合规时自动生成一个安全口令
+    if not (8 <= len(password) <= 63):
+        import secrets
+        import string
+
+        alphabet = string.ascii_letters + string.digits
+        password = "".join(secrets.choice(alphabet) for _ in range(16))
+        logger.info("No valid PUMP_AP_PASSWORD provided; generated one for this session.")
+
+    try:
+        if iscoroutinefunction(ensure_hotspot_async):
+            await ensure_hotspot_async(ssid=ssid, password=password, ifname=ifname)
+        else:
+            # 兼容 ensure_hotspot_async 若为同步函数的情况
+            ensure_hotspot_async(ssid=ssid, password=password, ifname=ifname)
+        logger.info("Hotspot enabled: ssid=%s ifname=%s", ssid, ifname)
+    except Exception as e:
+        # 明确记录，但不阻断服务
+        logger.warning("Hotspot creation failed: %s (service continues on LAN)", e)
 
 
+# -----------------------------------------------------------------------------
+# Helpers
+# -----------------------------------------------------------------------------
 def _ensure_valid_pump_id(pump_id: int) -> int:
     if pump_id not in (1, 2, 3, 4):
         raise HTTPException(status_code=400, detail="pump_id must be 1-4")
     return pump_id
 
 
-# ---------- Request/Response models ----------
+# -----------------------------------------------------------------------------
+# Pydantic models
+# -----------------------------------------------------------------------------
 class OpenBoardRequest(BaseModel):
     board_index: int = Field(ge=0, le=1)
     port: str
@@ -121,7 +182,9 @@ class SyringeUpdateRequest(BaseModel):
     models: List[SyringeModelRequest]
 
 
-# ---------- Routes ----------
+# -----------------------------------------------------------------------------
+# Routes
+# -----------------------------------------------------------------------------
 @app.get("/api/status")
 def get_status():
     return service.status()
@@ -246,10 +309,16 @@ def update_syringes(payload: SyringeUpdateRequest):
     return {"ok": True}
 
 
+@app.get("/healthz")
+def healthz():
+    return {"ok": True}
+
+
 @app.get("/", response_class=HTMLResponse)
 def root():
     """Serve the bundled single-page UI."""
     if INDEX_HTML.exists():
+        # FileResponse 自动处理正确的 header
         return FileResponse(INDEX_HTML)
     return HTMLResponse(
         "<!DOCTYPE html><html><head><meta charset='utf-8'><title>Poseidon Controller</title></head>"
@@ -259,7 +328,10 @@ def root():
 
 @app.on_event("shutdown")
 def _shutdown():
-    service.close_all()
+    try:
+        service.close_all()
+    except Exception as e:
+        logger.warning("Error during shutdown: %s", e)
 
 
 def get_app() -> FastAPI:
