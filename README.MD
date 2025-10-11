@@ -75,6 +75,11 @@ The software you will need to run on your computer in order to control the Ardui
 
 > 提示：Web 端的体积/速度换算仍依赖 `~/.poseidon_touch/` 下的校准数据，与原有 Qt GUI 共享设置。
 
+#### AP 热点自动开启
+- Web 控制服务启动时会尝试通过 `nmcli`（NetworkManager）在树莓派的 Wi-Fi 网卡上创建一个开放热点，SSID 为 `ShuofangLab_Pump`，密码为空，方便手机直接连接。
+- 该步骤需要具备操作网络接口的权限（通常需要以 `root` 身份运行或配置 `sudo` 免密）。如果树莓派使用的是默认的 `dhcpcd`/`wpa_supplicant` 配置而没有安装 NetworkManager，请先安装并启用 NetworkManager 后再启动服务。
+- 如果热点创建失败，日志会给出提示，此时可以手工检查 `nmcli device status` 是否能识别出无线网卡以及系统是否允许 AP 模式。
+
 You have the option of either (1) running from the source code in Python or (2) choosing the appropriate binary file below for your operating system and executing it. Before you run the controller code, MAKE SURE YOU HAVE INSTALLED THE ARDUINO FIRMWARE!!
 
 ## Startup Checklist

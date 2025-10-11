@@ -9,14 +9,15 @@ from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, validator
 
+from .hotspot import ensure_hotspot_async
 from .service import DEFAULT_BAUD, service
+
+app = FastAPI(title="Poseidon Web Controller", version="1.0.0")
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 if STATIC_DIR.exists():
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 INDEX_HTML = STATIC_DIR / "index.html"
-
-app = FastAPI(title="Poseidon Web Controller", version="1.0.0")
 
 # Allow same-network devices (e.g., phones) to call the API via browser
 app.add_middleware(
@@ -26,6 +27,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Ensure hotspot is up for mobile clients (best-effort).
+ensure_hotspot_async(ssid="ShuofangLab_Pump", password="")
 
 
 def _ensure_valid_pump_id(pump_id: int) -> int:
