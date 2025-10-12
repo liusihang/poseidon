@@ -349,6 +349,8 @@ class UnitConv:
             return UnitConv.vol_ml_to_length_mm(value, syr) * spm
         if unit == 'mL/min':
             return UnitConv.vol_ml_to_length_mm(value, syr) * spm / 60.0
+        if unit == 'uL/min':
+            return UnitConv.vol_ul_to_length_mm(value, syr) * spm / 60.0
         return value
 
     @staticmethod

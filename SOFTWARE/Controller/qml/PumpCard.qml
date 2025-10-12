@@ -22,7 +22,7 @@ Item {
 
             RowLayout { spacing: 8
                 TextField { id: spd; text: "0.50"; inputMethodHints: Qt.ImhFormattedNumbersOnly; Layout.preferredWidth: 120 }
-                ComboBox { id: spdUnit; model: ["mL/min","mL/s","mm/s"]; Layout.preferredWidth: 120 }
+                ComboBox { id: spdUnit; model: ["mL/min","uL/min","mL/s","mm/s"]; Layout.preferredWidth: 120 }
                 Button { text: "设速度"; onClicked: backend.setSpeed(root.pid, parseFloat(spd.text||"0"), spdUnit.currentText) }
                 TextField { id: acc; text: "5.0"; inputMethodHints: Qt.ImhFormattedNumbersOnly; Layout.preferredWidth: 120 }
                 ComboBox { id: accUnit; model: ["mL/s²","mm/s²"]; Layout.preferredWidth: 110 }
