@@ -80,6 +80,20 @@ The software you will need to run on your computer in order to control the Ardui
 - 该步骤需要具备操作网络接口的权限（通常需要以 `root` 身份运行或配置 `sudo` 免密）。如果树莓派使用的是默认的 `dhcpcd`/`wpa_supplicant` 配置而没有安装 NetworkManager，请先安装并启用 NetworkManager 后再启动服务。
 - 如果热点创建失败，日志会给出提示，此时可以手工检查 `nmcli device status` 是否能识别出无线网卡以及系统是否允许 AP 模式。
 
+#### Click2Run（触摸面板简易启动器）
+如果希望在树莓派的小屏幕上“一键启动 + 查看关键信息”：
+1. 确保已安装 PySide6 与 uvicorn 等依赖（同上 `pip install -r SOFTWARE/WebController/requirements.txt`）。
+2. 运行
+   ```bash
+   python SOFTWARE/start_poseidon.py
+   ```
+   程序会：
+   - 在后台启动 FastAPI 服务（同样带热点自动创建逻辑）；
+   - 显示一个触摸友好的小窗口，包含串口状态、剩余步数以及“刷新/两板归零/紧急停止”按钮；
+   - 在窗口顶部提示手机访问地址（`http://<树莓派IP>:8000/`）。
+3. 如果需要点击启动图标，可在树莓派桌面创建 `.desktop` 快捷方式，Exec 指向上述命令。
+4. 退出窗口时，后台 Web 服务也会一并停止。
+
 You have the option of either (1) running from the source code in Python or (2) choosing the appropriate binary file below for your operating system and executing it. Before you run the controller code, MAKE SURE YOU HAVE INSTALLED THE ARDUINO FIRMWARE!!
 
 ## Startup Checklist

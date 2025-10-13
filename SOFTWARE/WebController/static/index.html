@@ -3,14 +3,14 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Poseidon Web Controller</title>
+    <title>Shuofang_lab · Poseidon Web Controller</title>
     <link rel="stylesheet" href="/static/styles.css">
 </head>
 <body>
     <header class="top-bar">
         <div class="brand">
-            <h1>Poseidon Web Controller</h1>
-            <p>通过浏览器/手机操控树莓派上的注射泵。</p>
+            <h1>Shuofang_lab Poseidon 控制台</h1>
+            <p class="brand-tagline">用手机或浏览器接管树莓派注射泵，快速、稳定、随时可用。</p>
         </div>
         <div class="status-group">
             <span id="connection-status" class="status-pill status-disconnected">未连接</span>
@@ -21,7 +21,7 @@
     <main>
         <section class="panel">
             <header class="panel-header">
-                <h2>串口连接</h2>
+                <h2>串口管理</h2>
                 <div class="panel-actions">
                     <button id="refresh-ports" class="btn">刷新串口</button>
                     <button id="close-all" class="btn">全部断开</button>
@@ -29,7 +29,7 @@
             </header>
             <div class="panel-body board-grid">
                 <div class="board-card">
-                    <h3>主板 (P1/P2)</h3>
+                    <h3>主板 (P1 / P2)</h3>
                     <label class="field">
                         <span>串口</span>
                         <select id="port-select-0"></select>
@@ -45,7 +45,7 @@
                     <button id="connect-board-0" class="btn btn-primary">连接主板</button>
                 </div>
                 <div class="board-card">
-                    <h3>副板 (P3/P4)</h3>
+                    <h3>副板 (P3 / P4)</h3>
                     <label class="field">
                         <span>串口</span>
                         <select id="port-select-1"></select>
@@ -62,7 +62,7 @@
                 </div>
             </div>
             <footer class="panel-footer">
-                <button id="zero-all" class="btn">两板置零</button>
+                <button id="zero-all" class="btn">两板归零</button>
                 <button id="estop" class="btn btn-danger">紧急停止</button>
             </footer>
         </section>
@@ -96,10 +96,14 @@
                         <tbody id="syringe-table-body"></tbody>
                     </table>
                 </div>
-                <p class="hint">体积换算时使用列表的第一项，可通过上下移动按钮调整顺序。</p>
+                <p class="hint">体积换算默认使用列表的第一项，可通过上下移动按钮调整顺序。</p>
             </div>
         </section>
     </main>
+
+    <footer class="footer-note">
+        Made with ❤️ by Shuofang_lab · 使用前请确认硬件连接安全可靠
+    </footer>
 
     <div id="toast-container"></div>
     <script type="module" src="/static/app.js"></script>

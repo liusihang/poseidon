@@ -182,6 +182,10 @@ class SyringeUpdateRequest(BaseModel):
     models: List[SyringeModelRequest]
 
 
+class PumpNameRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=64)
+
+
 # -----------------------------------------------------------------------------
 # Routes
 # -----------------------------------------------------------------------------
@@ -251,6 +255,12 @@ def pause(pump_id: int):
     return {"ok": True}
 
 
+@app.post("/api/pumps/{pump_id}/zero")
+def zero_pump(pump_id: int):
+    service.zero_pump(_ensure_valid_pump_id(pump_id))
+    return {"ok": True}
+
+
 @app.post("/api/pumps/{pump_id}/stop")
 def stop(pump_id: int):
     service.stop(_ensure_valid_pump_id(pump_id))
@@ -306,6 +316,18 @@ def get_syringes():
 def update_syringes(payload: SyringeUpdateRequest):
     models = [{"name": m.name, "inner_d_mm": m.inner_d_mm} for m in payload.models]
     service.update_syringes(models)
+    return {"ok": True}
+
+
+@app.get("/api/pumps/names")
+def get_pump_names():
+    return {"pump_names": service.get_pump_names()}
+
+
+@app.post("/api/pumps/{pump_id}/name")
+def update_pump_name(pump_id: int, payload: PumpNameRequest):
+    pid = _ensure_valid_pump_id(pump_id)
+    service.set_pump_name(pid, payload.name)
     return {"ok": True}
 
 

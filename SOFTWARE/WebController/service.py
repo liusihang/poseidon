@@ -41,6 +41,10 @@ class PoseidonService:
         with self._lock:
             self._backend.zeroAll()
 
+    def zero_pump(self, pump_id: int) -> None:
+        with self._lock:
+            self._backend.zeroPump(pump_id)
+
     def estop(self) -> None:
         with self._lock:
             self._backend.estopAll()
@@ -106,6 +110,15 @@ class PoseidonService:
         with self._lock:
             self._backend.updateSyringes(models)
 
+    # ----------- Pump naming -----------
+    def get_pump_names(self) -> Dict[int, str]:
+        with self._lock:
+            return {i: self._backend.pump_names.get(i) for i in (1, 2, 3, 4)}
+
+    def set_pump_name(self, pump_id: int, name: str) -> None:
+        with self._lock:
+            self._backend.setPumpName(pump_id, name)
+
     # ----------- Status snapshots -----------
     def status(self) -> Dict[str, object]:
         with self._lock:
@@ -129,14 +142,15 @@ class PoseidonService:
             }
             syringes = [asdict(model) for model in self._backend.syr.models]
             ack = self._backend.ctrl.last_d2g()
+            names = {i: self._backend.pump_names.get(i) for i in (1, 2, 3, 4)}
         return {
             "boards": boards,
             "calibration": calib,
             "syringes": syringes,
             "ack": ack,
+            "pump_names": names,
         }
 
 
 # Shared singleton so uvicorn workers reuse hardware connection logic.
 service = PoseidonService()
-

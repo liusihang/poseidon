@@ -15,6 +15,7 @@ APP_DIR = Path.home() / ".poseidon_touch"
 APP_DIR.mkdir(parents=True, exist_ok=True)
 CALIB_PATH = APP_DIR / "calibration.json"
 SYRINGE_PATH = APP_DIR / "syringes.json"
+PUMP_NAMES_PATH = APP_DIR / "pump_names.json"
 
 DEFAULT_BAUD = 230400
 POLL_INTERVAL_SEC = 0.20
@@ -240,10 +241,20 @@ class DualBoardController(QtCore.QObject):
         if b1:
             self.links[1].send(self._frame("RESUME", "BLAH", self._mask(b1), 0.0, 'F', 0, 0, 0, 0))
 
-    def zero(self):
-        f = self._frame("ZERO", "BLAH", '0', 0.0, 'F', 0, 0, 0, 0)
-        for l in self.links:
-            l.send(f)
+    def zero(self, pump_ids=None):
+        if pump_ids is None:
+            pump_ids = [1, 2, 3, 4]
+        self._zero_subset(pump_ids)
+
+    def _zero_subset(self, pump_ids):
+        b0 = [p for p in pump_ids if p in (1, 2)]
+        b1 = [p for p in pump_ids if p in (3, 4)]
+        if b0:
+            f0 = self._frame("ZERO", "BLAH", self._mask(b0), 0.0, 'F', 0, 0, 0, 0)
+            self.links[0].send(f0)
+        if b1:
+            f1 = self._frame("ZERO", "BLAH", self._mask(b1), 0.0, 'F', 0, 0, 0, 0)
+            self.links[1].send(f1)
 
     # 轮询
     def _poll_loop(self):
@@ -331,6 +342,32 @@ class SyringeStore:
         return self.models[0]
 
 
+class PumpNameStore:
+    def __init__(self):
+        self.names: Dict[int, str] = {i: f"Pump {i}" for i in (1, 2, 3, 4)}
+        self.load()
+
+    def load(self):
+        if PUMP_NAMES_PATH.exists():
+            try:
+                obj = json.loads(PUMP_NAMES_PATH.read_text())
+                for k, v in obj.items():
+                    self.names[int(k)] = str(v)
+            except Exception:
+                pass
+
+    def save(self):
+        data = {str(i): self.names[i] for i in (1, 2, 3, 4)}
+        PUMP_NAMES_PATH.write_text(json.dumps(data, indent=2, ensure_ascii=False))
+
+    def get(self, pump_id: int) -> str:
+        return self.names.get(pump_id, f"Pump {pump_id}")
+
+    def set(self, pump_id: int, name: str):
+        self.names[pump_id] = name.strip() or f"Pump {pump_id}"
+        self.save()
+
+
 # ------- 单位换算 -------
 class UnitConv:
     @staticmethod
@@ -376,6 +413,7 @@ class Backend(QtCore.QObject):
         self.ctrl.logLine.connect(self.logLine)
         self.calib = CalibrationStore()
         self.syr = SyringeStore()
+        self.pump_names = PumpNameStore()
 
     # ---------- 串口 ----------
     @QtCore.Slot(result=list)
@@ -397,6 +435,10 @@ class Backend(QtCore.QObject):
     @QtCore.Slot()
     def zeroAll(self):
         self.ctrl.zero()
+
+    @QtCore.Slot(int)
+    def zeroPump(self, pumpId: int):
+        self.ctrl.zero([pumpId])
 
     @QtCore.Slot()
     def estopAll(self):
@@ -420,6 +462,14 @@ class Backend(QtCore.QObject):
             models.append(SyringeModel(name, dmm))
         self.syr.models = models
         self.syr.save()
+
+    @QtCore.Slot(result=list)
+    def pumpNames(self) -> List[str]:
+        return [self.pump_names.get(i) for i in (1, 2, 3, 4)]
+
+    @QtCore.Slot(int, str)
+    def setPumpName(self, pumpId: int, name: str):
+        self.pump_names.set(pumpId, name)
 
     # ---------- 校准 ----------
     @QtCore.Slot(int, result=float)

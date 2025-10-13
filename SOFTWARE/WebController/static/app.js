@@ -2,18 +2,17 @@ const state = {
     ports: [],
     status: null,
     syringes: [],
+    pumpNames: { 1: "Pump 1", 2: "Pump 2", 3: "Pump 3", 4: "Pump 4" },
 };
 
 const API_BASE = "";
 const DEFAULT_SPM = 800.0;
+const JOG_SLIDER_THRESHOLD = 0.05;
 
 const pumpGrid = document.querySelector("#pump-grid");
 
-async function apiRequest(path, { method = "GET", body = undefined } = {}) {
-    const opts = {
-        method,
-        headers: {},
-    };
+async function apiRequest(path, { method = "GET", body } = {}) {
+    const opts = { method, headers: {} };
     if (body !== undefined) {
         opts.headers["Content-Type"] = "application/json";
         opts.body = JSON.stringify(body);
@@ -32,9 +31,7 @@ async function apiRequest(path, { method = "GET", body = undefined } = {}) {
         }
         throw new Error(message);
     }
-    if (!text) {
-        return {};
-    }
+    if (!text) return {};
     try {
         return JSON.parse(text);
     } catch {
@@ -52,9 +49,11 @@ function showToast(message, type = "info", timeout = 2600) {
     toast.className = `toast ${type}`;
     toast.textContent = message;
     container.appendChild(toast);
-    setTimeout(() => {
-        toast.remove();
-    }, timeout);
+    setTimeout(() => toast.remove(), timeout);
+}
+
+function getPumpDisplayName(pid) {
+    return state.pumpNames[pid] || `Pump ${pid}`;
 }
 
 function createPumpCards() {
@@ -65,8 +64,16 @@ function createPumpCards() {
         card.dataset.pump = String(pid);
         card.innerHTML = `
             <div class="pump-header">
-                <h3>Pump ${pid}</h3>
-                <span data-field="remaining">余步 --</span>
+                <div>
+                    <h3 data-field="pump-name">${getPumpDisplayName(pid)}</h3>
+                    <span class="pump-subtitle">通道 ${pid}</span>
+                </div>
+                <div class="pump-header-actions">
+                    <button class="btn-icon" data-action="rename" title="重命名泵">
+                        <span aria-hidden="true">✎</span>
+                    </button>
+                    <span data-field="remaining" class="remaining-tag">余步 --</span>
+                </div>
             </div>
 
             <div class="control-group">
@@ -117,6 +124,7 @@ function createPumpCards() {
                     <button class="btn small-button" data-action="pause">暂停</button>
                     <button class="btn small-button" data-action="stop">停止</button>
                     <button class="btn small-button" data-action="resume">继续</button>
+                    <button class="btn small-button" data-action="zero">归零</button>
                 </div>
             </div>
 
@@ -132,13 +140,21 @@ function createPumpCards() {
                     <button class="btn small-button" data-action="jog" data-direction="-1">◀︎</button>
                     <button class="btn small-button" data-action="jog" data-direction="1">▶︎</button>
                 </div>
+                <div class="jog-slider-wrap">
+                    <input type="range" min="-1" max="1" step="0.05" value="0" data-field="jog-slider">
+                    <div class="slider-labels">
+                        <span>反向</span>
+                        <span>归中</span>
+                        <span>正向</span>
+                    </div>
+                </div>
             </div>
 
             <div class="control-group">
                 <label>步距校准</label>
                 <div class="field-row">
                     <input type="number" step="0.001" min="0" data-field="steps-input" value="${DEFAULT_SPM.toFixed(3)}">
-                    <span class="switch">当前：<span data-field="steps-display">--</span> steps/mm</span>
+                    <span class="switch">当前 <span data-field="steps-display">--</span> steps/mm</span>
                 </div>
                 <div class="switch">
                     <input type="checkbox" data-field="invert-toggle" id="invert-${pid}">
@@ -174,31 +190,32 @@ function createPumpCards() {
     }
 }
 
+function updatePumpNameElements() {
+    document.querySelectorAll(".pump-card").forEach((card) => {
+        const pid = Number(card.dataset.pump);
+        const title = card.querySelector('[data-field="pump-name"]');
+        if (title) title.textContent = getPumpDisplayName(pid);
+    });
+}
+
 function updateSyringeSelects() {
     const options = state.syringes.map((s) => `<option value="${s.name}">${s.name}</option>`).join("");
     document.querySelectorAll(".syringe-select").forEach((select) => {
         const previous = select.value;
-        select.innerHTML = options;
-        if (state.syringes.length === 0) {
-            select.innerHTML = '<option value="">--</option>';
-            return;
-        }
+        select.innerHTML = state.syringes.length ? options : '<option value="">--</option>';
+        if (!state.syringes.length) return;
         if (state.syringes.some((s) => s.name === previous)) {
             select.value = previous;
         } else {
             select.selectedIndex = 0;
         }
-        const card = select.closest(".pump-card");
-        updateSyringeDiameter(card);
+        updateSyringeDiameter(select.closest(".pump-card"));
     });
 
     document.querySelectorAll('[data-field="cal-syringe"]').forEach((select) => {
         const prev = select.value;
-        select.innerHTML = options;
-        if (state.syringes.length === 0) {
-            select.innerHTML = '<option value="">--</option>';
-            return;
-        }
+        select.innerHTML = state.syringes.length ? options : '<option value="">--</option>';
+        if (!state.syringes.length) return;
         if (state.syringes.some((s) => s.name === prev)) {
             select.value = prev;
         } else {
@@ -213,11 +230,7 @@ function updateSyringeDiameter(card) {
     const label = card.querySelector('[data-field="syringe-diam"]');
     if (!select || !label) return;
     const model = state.syringes.find((s) => s.name === select.value);
-    if (model) {
-        label.textContent = `Ø ${Number(model.inner_d_mm).toFixed(3)} mm`;
-    } else {
-        label.textContent = "Ø -- mm";
-    }
+    label.textContent = model ? `Ø ${Number(model.inner_d_mm).toFixed(3)} mm` : "Ø -- mm";
 }
 
 function renderPorts() {
@@ -230,13 +243,9 @@ function renderPorts() {
         select.innerHTML = portOptions;
         const board = state.status?.boards?.find((b) => b.index === idx);
         const desired = board?.port || current;
-        if (desired && ports.includes(desired)) {
-            select.value = desired;
-        }
+        if (desired && ports.includes(desired)) select.value = desired;
         const baudSelect = document.querySelector(`#baud-select-${idx}`);
-        if (board && baudSelect) {
-            baudSelect.value = String(board.baud || baudSelect.value);
-        }
+        if (board && baudSelect) baudSelect.value = String(board.baud || baudSelect.value);
     });
 }
 
@@ -260,34 +269,28 @@ function renderStatus() {
 
     const ack = status?.ack ?? [];
     const ackSummary = document.querySelector("#ack-summary");
-    ackSummary.textContent = ack.length ? `剩余步数：${ack.map((v, i) => `P${i + 1}=${v}`).join(" / ")}` : "";
+    ackSummary.textContent = ack.length
+        ? `剩余步数：${ack.map((v, i) => `${getPumpDisplayName(i + 1)}:${v}`).join(" / ")}`
+        : "";
 
     document.querySelectorAll(".pump-card").forEach((card) => {
         const pid = Number(card.dataset.pump);
         const remaining = ack[pid - 1];
         const remEl = card.querySelector('[data-field="remaining"]');
-        if (remEl) {
-            remEl.textContent = Number.isFinite(remaining) ? `余步 ${remaining}` : "余步 --";
-        }
+        if (remEl) remEl.textContent = Number.isFinite(remaining) ? `余步 ${remaining}` : "余步 --";
         const cal = status?.calibration?.[pid];
         if (cal) {
             const steps = Number(cal.steps_per_mm) || 0;
             const stepsDisplay = card.querySelector('[data-field="steps-display"]');
-            if (stepsDisplay) {
-                stepsDisplay.textContent = steps.toFixed(3);
-            }
+            if (stepsDisplay) stepsDisplay.textContent = steps.toFixed(3);
             const stepsInput = card.querySelector('[data-field="steps-input"]');
-            if (stepsInput && document.activeElement !== stepsInput) {
-                stepsInput.value = steps.toFixed(3);
-            }
+            if (stepsInput && document.activeElement !== stepsInput) stepsInput.value = steps.toFixed(3);
             const invert = card.querySelector('[data-field="invert-toggle"]');
-            if (invert) {
-                invert.checked = Boolean(cal.invert_dir);
-            }
+            if (invert) invert.checked = Boolean(cal.invert_dir);
         }
-        updateSyringeDiameter(card);
     });
 
+    updatePumpNameElements();
     renderPorts();
 }
 
@@ -295,17 +298,15 @@ function renderSyringeTable() {
     const tbody = document.querySelector("#syringe-table-body");
     tbody.innerHTML = "";
     if (!state.syringes.length) {
-        const row = document.createElement("tr");
-        row.innerHTML = `<td colspan="3" style="text-align:center;color:var(--muted);">暂无数据</td>`;
-        tbody.appendChild(row);
+        tbody.innerHTML = `<tr><td colspan="3" style="text-align:center;color:var(--muted);">暂无数据</td></tr>`;
         return;
     }
     state.syringes.forEach((model, idx) => {
         const row = document.createElement("tr");
         row.dataset.index = String(idx);
         row.innerHTML = `
-            <td><input type="text" data-field="syr-name" value="${model.name ?? ""}" placeholder="型号名称"></td>
-            <td><input type="number" step="0.001" min="0" data-field="syr-diam" value="${Number(model.inner_d_mm ?? 0).toFixed(3)}"></td>
+            <td><input type="text" data-field="syr-name" value="${model.name}" placeholder="型号名称"></td>
+            <td><input type="number" step="0.001" min="0" data-field="syr-diam" value="${Number(model.inner_d_mm).toFixed(3)}"></td>
             <td>
                 <div class="row-actions">
                     <button class="row-btn" data-action="syr-up">上移</button>
@@ -322,6 +323,12 @@ async function refreshStatus() {
     try {
         const data = await apiGet("/api/status");
         state.status = data;
+        if (data.pump_names) {
+            Object.entries(data.pump_names).forEach(([key, value]) => {
+                const pid = Number(key);
+                if (Number.isFinite(pid)) state.pumpNames[pid] = String(value);
+            });
+        }
         renderStatus();
     } catch (err) {
         showToast(`刷新状态失败：${err.message}`, "error", 3000);
@@ -385,47 +392,52 @@ async function handlePumpAction(card, action, target) {
                 const value = Number(card.querySelector('[data-field="speed-value"]')?.value || "0");
                 const unit = card.querySelector('[data-field="speed-unit"]')?.value;
                 await apiPost(`/api/pumps/${pumpId}/speed`, { value, unit });
-                showToast(`P${pumpId} 速度已更新`, "success");
+                showToast(`${getPumpDisplayName(pumpId)} 速度已更新`, "success");
                 break;
             }
             case "set-accel": {
                 const value = Number(card.querySelector('[data-field="accel-value"]')?.value || "0");
                 const unit = card.querySelector('[data-field="accel-unit"]')?.value;
                 await apiPost(`/api/pumps/${pumpId}/accel`, { value, unit });
-                showToast(`P${pumpId} 加速度已更新`, "success");
+                showToast(`${getPumpDisplayName(pumpId)} 加速度已更新`, "success");
                 break;
             }
             case "run": {
                 const value = Number(card.querySelector('[data-field="run-value"]')?.value || "0");
                 const unit = card.querySelector('[data-field="run-unit"]')?.value;
                 await apiPost(`/api/pumps/${pumpId}/run`, { value, unit });
-                showToast(`P${pumpId} 已开始运行`, "info");
+                showToast(`${getPumpDisplayName(pumpId)} 已开始运行`, "info");
                 break;
             }
             case "pause":
                 await apiPost(`/api/pumps/${pumpId}/pause`);
-                showToast(`P${pumpId} 已暂停`, "info");
+                showToast(`${getPumpDisplayName(pumpId)} 已暂停`, "info");
                 break;
             case "stop":
                 await apiPost(`/api/pumps/${pumpId}/stop`);
-                showToast(`P${pumpId} 已停止`, "info");
+                showToast(`${getPumpDisplayName(pumpId)} 已停止`, "info");
                 break;
             case "resume":
                 await apiPost(`/api/pumps/${pumpId}/resume`);
-                showToast(`P${pumpId} 已继续`, "info");
+                showToast(`${getPumpDisplayName(pumpId)} 已继续`, "info");
+                break;
+            case "zero":
+                await apiPost(`/api/pumps/${pumpId}/zero`);
+                showToast(`${getPumpDisplayName(pumpId)} 已归零`, "success");
+                await refreshStatus();
                 break;
             case "jog": {
-                const delta = Number(card.querySelector('[data-field="jog-value"]')?.value || "0");
+                const base = Number(card.querySelector('[data-field="jog-value"]')?.value || "0");
                 const unit = card.querySelector('[data-field="jog-unit"]')?.value;
                 const direction = Number(target.dataset.direction || "1");
-                await apiPost(`/api/pumps/${pumpId}/jog`, { delta: direction * delta, unit });
-                showToast(`P${pumpId} JOG 已发送`, "info");
+                await apiPost(`/api/pumps/${pumpId}/jog`, { delta: direction * base, unit });
+                showToast(`${getPumpDisplayName(pumpId)} 点动已发送`, "info");
                 break;
             }
             case "set-steps": {
                 const steps = Number(card.querySelector('[data-field="steps-input"]')?.value || "0");
                 await apiPost(`/api/calibration/${pumpId}/steps`, { steps_per_mm: steps });
-                showToast(`P${pumpId} 步距已保存`, "success");
+                showToast(`${getPumpDisplayName(pumpId)} 步距已保存`, "success");
                 await refreshStatus();
                 break;
             }
@@ -433,7 +445,7 @@ async function handlePumpAction(card, action, target) {
                 const plan = Number(card.querySelector('[data-field="plan-mm"]')?.value || "0");
                 const meas = Number(card.querySelector('[data-field="meas-mm"]')?.value || "0");
                 const res = await apiPost(`/api/calibration/${pumpId}/travel`, { plan_mm: plan, meas_mm: meas });
-                showToast(`P${pumpId} 行程修正: ${Number(res.steps_per_mm).toFixed(3)}`, "success");
+                showToast(`${getPumpDisplayName(pumpId)} 行程修正: ${Number(res.steps_per_mm).toFixed(3)}`, "success");
                 await refreshStatus();
                 break;
             }
@@ -446,8 +458,23 @@ async function handlePumpAction(card, action, target) {
                     meas_ml: measMl,
                     syringe_name: syringe,
                 });
-                showToast(`P${pumpId} 体积修正: ${Number(res.steps_per_mm).toFixed(3)}`, "success");
+                showToast(`${getPumpDisplayName(pumpId)} 体积修正: ${Number(res.steps_per_mm).toFixed(3)}`, "success");
                 await refreshStatus();
+                break;
+            }
+            case "rename": {
+                const current = getPumpDisplayName(pumpId);
+                const value = window.prompt("输入新的泵名称：", current);
+                if (value === null) break;
+                const trimmed = value.trim();
+                if (!trimmed) {
+                    showToast("名称不能为空", "error");
+                    break;
+                }
+                await apiPost(`/api/pumps/${pumpId}/name`, { name: trimmed });
+                state.pumpNames[pumpId] = trimmed;
+                updatePumpNameElements();
+                showToast(`名称已更新为 ${trimmed}`, "success");
                 break;
             }
             default:
@@ -462,10 +489,9 @@ async function saveInvert(card, invert) {
     const pumpId = Number(card.dataset.pump);
     try {
         await apiPost(`/api/calibration/${pumpId}/invert`, { invert });
-        showToast(`P${pumpId} 方向已更新`, "success");
+        showToast(`${getPumpDisplayName(pumpId)} 方向已更新`, "success");
     } catch (err) {
         showToast(`更新方向失败：${err.message}`, "error", 3200);
-        // revert toggle
         const toggle = card.querySelector('[data-field="invert-toggle"]');
         if (toggle) toggle.checked = !invert;
     }
@@ -509,8 +535,46 @@ async function saveSyringes() {
     await refreshSyringes();
 }
 
+function deleteSyringesWithConfirm(idx) {
+    if (state.syringes.length <= 1) {
+        showToast("至少保留一个型号", "error");
+        return;
+    }
+    deleteSyringe(idx);
+}
+
+function handleJogSlider(target) {
+    const card = target.closest(".pump-card");
+    if (!card) return;
+    const pumpId = Number(card.dataset.pump);
+    const sliderValue = Number(target.value);
+    const magnitude = Number(card.querySelector('[data-field="jog-value"]')?.value || "0");
+    const unit = card.querySelector('[data-field="jog-unit"]')?.value;
+    if (!Number.isFinite(magnitude) || magnitude <= 0) {
+        target.value = "0";
+        showToast("点动幅度需大于 0", "error");
+        return;
+    }
+    if (!Number.isFinite(sliderValue) || Math.abs(sliderValue) < JOG_SLIDER_THRESHOLD) {
+        target.value = "0";
+        return;
+    }
+    const delta = sliderValue * magnitude;
+    (async () => {
+        try {
+            await apiPost(`/api/pumps/${pumpId}/jog`, { delta, unit });
+            showToast(`${getPumpDisplayName(pumpId)} JOG (${delta.toFixed(3)} ${unit})`, "info");
+        } catch (err) {
+            showToast(`点动失败：${err.message}`, "error", 3200);
+        } finally {
+            target.value = "0";
+        }
+    })();
+}
+
 async function init() {
     createPumpCards();
+
     pumpGrid.addEventListener("click", (event) => {
         const target = event.target;
         if (!(target instanceof HTMLElement)) return;
@@ -520,6 +584,7 @@ async function init() {
         if (!card) return;
         handlePumpAction(card, action, target);
     });
+
     pumpGrid.addEventListener("change", (event) => {
         const target = event.target;
         if (!(target instanceof HTMLElement)) return;
@@ -529,12 +594,12 @@ async function init() {
             saveInvert(card, target.checked);
         } else if (target.matches(".syringe-select")) {
             updateSyringeDiameter(card);
+        } else if (target.matches('[data-field="jog-slider"]')) {
+            handleJogSlider(target);
         }
     });
 
-    document.querySelector("#refresh-ports")?.addEventListener("click", () => {
-        refreshPorts();
-    });
+    document.querySelector("#refresh-ports")?.addEventListener("click", refreshPorts);
     document.querySelector("#connect-board-0")?.addEventListener("click", () => connectBoard(0));
     document.querySelector("#connect-board-1")?.addEventListener("click", () => connectBoard(1));
     document.querySelector("#close-all")?.addEventListener("click", closeAllBoards);
@@ -557,26 +622,14 @@ async function init() {
         if (!row) return;
         const idx = Number(row.dataset.index);
         if (Number.isNaN(idx)) return;
-        if (target.dataset.action === "syr-up") {
-            reorderSyringes(idx, idx - 1);
-        } else if (target.dataset.action === "syr-down") {
-            reorderSyringes(idx, idx + 1);
-        } else if (target.dataset.action === "syr-delete") {
-            deleteSyringesWithConfirm(idx);
-        }
+        if (target.dataset.action === "syr-up") reorderSyringes(idx, idx - 1);
+        if (target.dataset.action === "syr-down") reorderSyringes(idx, idx + 1);
+        if (target.dataset.action === "syr-delete") deleteSyringesWithConfirm(idx);
     });
 
     await Promise.all([refreshPorts(), refreshSyringes(), refreshStatus()]);
     setInterval(refreshStatus, 2000);
     setInterval(refreshPorts, 12000);
-}
-
-function deleteSyringesWithConfirm(idx) {
-    if (state.syringes.length <= 1) {
-        showToast("至少保留一个型号", "error");
-        return;
-    }
-    deleteSyringe(idx);
 }
 
 document.addEventListener("DOMContentLoaded", () => {
