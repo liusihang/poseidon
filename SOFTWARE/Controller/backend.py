@@ -523,7 +523,9 @@ class Backend(QtCore.QObject):
     @QtCore.Slot(int, float, float, str, result=float)
     def applyVolumeCalibration(self, pumpId: int, target_ml: float, meas_ml: float, syringeName: str) -> float:
         spm1 = self.calib.by_pump[pumpId].steps_per_mm
-        # Volume ratio correction (syringe cross-section already accounted for in length conversion)        spm2 = spm1 * (target_ml / max(0.001, meas_ml))
+        # Volume ratio correction (syringe cross-section already accounted for in length conversion)
+        ratio = target_ml / max(0.001, meas_ml)
+        spm2 = spm1 * ratio
         self.calib.by_pump[pumpId].steps_per_mm = spm2
         self.calib.save()
         return float(spm2)
