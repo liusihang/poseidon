@@ -57,7 +57,7 @@ DEFAULT_SYRINGES = [
 ]
 
 
-# ------- 串口链路（单板） -------
+# ------- Serial link (single board) -------
 class SerialLink(QtCore.QObject):
     lineReceived = QtCore.Signal(str)
     portStatus = QtCore.Signal(bool)
@@ -70,7 +70,7 @@ class SerialLink(QtCore.QObject):
         self._ser = None
         self._rx_thread = None
         self._stop = threading.Event()
-        self._tx_queue = queue.Queue()
+        self._tx_queue = queue.Queue(maxsize=200)
 
     def set_port(self, port: str, baud: int):
         self.port_name = port
@@ -111,23 +111,44 @@ class SerialLink(QtCore.QObject):
     def send(self, frame: str):
         if not frame.endswith('>'):
             raise ValueError("frame must end with '>'")
-        self._tx_queue.put(frame)
+        ser = self._ser
+        if ser is None or not getattr(ser, 'is_open', False):
+            self.logLine.emit("[TX-DROP] serial port not open; frame discarded")
+            return
+        try:
+            self._tx_queue.put_nowait(frame)
+        except queue.Full:
+            try:
+                _ = self._tx_queue.get_nowait()
+            except queue.Empty:
+                pass
+            try:
+                self._tx_queue.put_nowait(frame)
+                self.logLine.emit("[TX-WARN] transmit queue full, dropping oldest frame")
+            except queue.Full:
+                self.logLine.emit("[TX-DROP] transmit queue saturated; frame discarded")
 
     def _io_loop(self):
         buf = ''
         last_hb = time.time()
         while not self._stop.is_set():
-            # 发送
+            # Send
             try:
                 f = self._tx_queue.get_nowait()
-                if self._ser:
-                    self._ser.write(f.encode('ascii'))
-                    self.logLine.emit(f"TX {f}")
+                ser = self._ser
+                if ser and getattr(ser, 'is_open', False):
+                    try:
+                        ser.write(f.encode('ascii'))
+                        self.logLine.emit(f"TX {f}")
+                    except Exception as exc:
+                        self.logLine.emit(f"[TX-ERR] {exc}")
+                        self.close()
+                        break
             except queue.Empty:
                 pass
-            # 接收
+            # Receive
             try:
-                if self._ser and self._ser.in_waiting:
+                if self._ser and getattr(self._ser, 'in_waiting', 0):
                     data = self._ser.read(self._ser.in_waiting).decode('ascii', errors='ignore')
                     buf += data
                     while True:
@@ -147,25 +168,26 @@ class SerialLink(QtCore.QObject):
             time.sleep(0.004)
 
 
-# ------- 跨板控制器 -------
+
+# ------- Dual-board controller -------
 class DualBoardController(QtCore.QObject):
     ackChanged = QtCore.Signal(int, int, int, int)  # p1..p4 remaining steps
     logLine = QtCore.Signal(str)
 
     def __init__(self):
         super().__init__()
-        self.links = [SerialLink(), SerialLink()]  # 0: 主板(P1,P2) 1: 副板(P3,P4)
+        self.links = [SerialLink(), SerialLink()]  # 0: main board (P1,P2); 1: aux board (P3,P4)
         for i, l in enumerate(self.links):
             l.lineReceived.connect(lambda s, i=i: self._on_line(i, s))
             l.logLine.connect(self.logLine)
         self._last_d2g = [0, 0, 0, 0]
         self._lock = threading.Lock()
-        # 轮询线程：发送 DELTA 获取 ACK
+        # Polling thread: send DELTA requests to obtain ACK
         self._stop = threading.Event()
         self._poll_thr = threading.Thread(target=self._poll_loop, daemon=True)
         self._poll_thr.start()
 
-    # 端口管理
+    # Port management
     def set_board_port(self, idx: int, port: str, baud: int):
         self.links[idx].set_port(port, baud)
 
@@ -176,7 +198,7 @@ class DualBoardController(QtCore.QObject):
         for l in self.links:
             l.close()
 
-    # 指令工具
+    # Instruction helpers
     @staticmethod
     def _mask(pumps: List[int]) -> str:
         s = ''.join(str(p) for p in sorted(set(pumps)))
@@ -186,7 +208,7 @@ class DualBoardController(QtCore.QObject):
     def _frame(mode, setting, pumps, val, direction, p1, p2, p3, p4):
         return f"<{mode},{setting},{pumps},{val:.6f},{direction},{p1},{p2},{p3},{p4}>"
 
-    # 高层 API
+    # High-level API
     def set_speed(self, pump_ids: List[int], steps_per_s: float):
         b0 = [p for p in pump_ids if p in (1, 2)]
         b1 = [p for p in pump_ids if p in (3, 4)]
@@ -256,7 +278,7 @@ class DualBoardController(QtCore.QObject):
             f1 = self._frame("ZERO", "BLAH", self._mask(b1), 0.0, 'F', 0, 0, 0, 0)
             self.links[1].send(f1)
 
-    # 轮询
+    # Polling
     def _poll_loop(self):
         while not self._stop.is_set():
             f = self._frame("SETTING", "DELTA", '0', 0.0, 'F', 0, 0, 0, 0)
@@ -268,7 +290,7 @@ class DualBoardController(QtCore.QObject):
             time.sleep(POLL_INTERVAL_SEC)
 
     def _on_line(self, board_idx: int, frame: str):
-        # 期待 <d2g1,d2g2,d2g3,d2g4>
+        # Expect <d2g1,d2g2,d2g3,d2g4>
         try:
             if not (frame.startswith('<') and frame.endswith('>')):
                 return
@@ -294,7 +316,7 @@ class DualBoardController(QtCore.QObject):
             return self._last_d2g[:]
 
 
-# ------- 存储 -------
+# ------- Storage -------
 class CalibrationStore:
     def __init__(self):
         self.by_pump: Dict[int, PumpCalibration] = {i: PumpCalibration() for i in (1, 2, 3, 4)}
@@ -368,7 +390,7 @@ class PumpNameStore:
         self.save()
 
 
-# ------- 单位换算 -------
+# ------- Unit conversions -------
 class UnitConv:
     @staticmethod
     def vol_ml_to_length_mm(v_ml: float, syr: SyringeModel) -> float:
@@ -392,16 +414,16 @@ class UnitConv:
 
     @staticmethod
     def accel_to_steps_per_s2(value: float, unit: str, syr: SyringeModel, spm: float) -> float:
-        if unit == 'mm/s²':
+        if unit == 'mm/s^2':
             return value * spm
-        if unit == 'mL/s²':
+        if unit == 'mL/s^2':
             return UnitConv.vol_ml_to_length_mm(value, syr) * spm
         return value
 
 
-# ------- QML 后端桥 -------
+# ------- QML backend bridge -------
 class Backend(QtCore.QObject):
-    # 状态/日志/端口
+    # Status / log / ports
     ackChanged = QtCore.Signal(int, int, int, int)  # p1..p4
     logLine = QtCore.Signal(str)
     portsChanged = QtCore.Signal(list)
@@ -415,7 +437,7 @@ class Backend(QtCore.QObject):
         self.syr = SyringeStore()
         self.pump_names = PumpNameStore()
 
-    # ---------- 串口 ----------
+    # ---------- Serial ----------
     @QtCore.Slot(result=list)
     def listPorts(self):
         ports = [p.device for p in serial.tools.list_ports.comports()]
@@ -444,7 +466,7 @@ class Backend(QtCore.QObject):
     def estopAll(self):
         self.ctrl.stop([1, 2, 3, 4])
 
-    # ---------- 注射器 ----------
+    # ---------- Syringes ----------
     @QtCore.Slot(result=list)
     def syringeNames(self) -> List[str]:
         return self.syr.names()
@@ -471,7 +493,7 @@ class Backend(QtCore.QObject):
     def setPumpName(self, pumpId: int, name: str):
         self.pump_names.set(pumpId, name)
 
-    # ---------- 校准 ----------
+    # ---------- Calibration ----------
     @QtCore.Slot(int, result=float)
     def getStepsPerMm(self, pumpId: int) -> float:
         return float(self.calib.by_pump[pumpId].steps_per_mm)
@@ -501,16 +523,15 @@ class Backend(QtCore.QObject):
     @QtCore.Slot(int, float, float, str, result=float)
     def applyVolumeCalibration(self, pumpId: int, target_ml: float, meas_ml: float, syringeName: str) -> float:
         spm1 = self.calib.by_pump[pumpId].steps_per_mm
-        # 体积比例修正（与注射器面积相关在长度换算中已包含，比例法仍可直接按体积比修正）
-        spm2 = spm1 * (target_ml / max(0.001, meas_ml))
+        # Volume ratio correction (syringe cross-section already accounted for in length conversion)        spm2 = spm1 * (target_ml / max(0.001, meas_ml))
         self.calib.by_pump[pumpId].steps_per_mm = spm2
         self.calib.save()
         return float(spm2)
 
-    # ---------- 运动 ----------
+    # ---------- Motion ----------
     @QtCore.Slot(int, float, str)
     def setSpeed(self, pumpId: int, v: float, unit: str):
-        syr = self.syr.by_name(self.syr.names()[0])  # 速度与注射器无强绑定，但若需可传当前选择
+        syr = self.syr.by_name(self.syr.names()[0])  # Speed loosely tied to syringe; use current selection
         spm = self.calib.by_pump[pumpId].steps_per_mm
         steps_s = UnitConv.speed_to_steps_per_s(v, unit, syr, spm)
         self.ctrl.set_speed([pumpId], steps_s)
@@ -524,8 +545,8 @@ class Backend(QtCore.QObject):
 
     @QtCore.Slot(int, float, str)
     def run(self, pumpId: int, value: float, unit: str):
-        # 单泵运行：体积/位移 → 步
-        # 注意方向：根据 invert_dir 决定 F/B
+        # Single pump move: convert volume/displacement to steps
+        # Direction determined by invert_dir
         syr = self.syr.by_name(self.syr.names()[0])
         cal = self.calib.by_pump[pumpId]
         if unit == 'mm':
@@ -542,6 +563,7 @@ class Backend(QtCore.QObject):
         p3 = steps if p == 3 else 0
         p4 = steps if p == 4 else 0
         self.ctrl.run_dist(p1, p2, p3, p4, direction)
+        time.sleep(0.05)
 
     @QtCore.Slot(int, float, str)
     def jog(self, pumpId: int, delta: float, unit: str):
@@ -554,7 +576,7 @@ class Backend(QtCore.QObject):
         else:
             length_mm = UnitConv.vol_ul_to_length_mm(abs(delta), syr)
         steps = int(round(length_mm * cal.steps_per_mm))
-        # 负号与 invert_dir 异或决定最终方向
+        # Sign XOR invert_dir decides final direction
         direction = 'B' if ((delta < 0) ^ cal.invert_dir) else 'F'
         p = pumpId
         p1 = steps if p == 1 else 0
@@ -570,3 +592,5 @@ class Backend(QtCore.QObject):
     @QtCore.Slot(int)
     def pausePump(self, pumpId: int):
         self.ctrl.pause([pumpId])
+
+

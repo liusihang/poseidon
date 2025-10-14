@@ -1,4 +1,4 @@
-const state = {
+﻿const state = {
     ports: [],
     status: null,
     syringes: [],
@@ -66,26 +66,26 @@ function createPumpCards() {
             <div class="pump-header">
                 <div>
                     <h3 data-field="pump-name">${getPumpDisplayName(pid)}</h3>
-                    <span class="pump-subtitle">通道 ${pid}</span>
+                    <span class="pump-subtitle">閫氶亾 ${pid}</span>
                 </div>
                 <div class="pump-header-actions">
-                    <button class="btn-icon" data-action="rename" title="重命名泵">
-                        <span aria-hidden="true">✎</span>
+                    <button class="btn-icon" data-action="rename" title="閲嶅懡鍚嶆车">
+                        <span aria-hidden="true">鉁?/span>
                     </button>
-                    <span data-field="remaining" class="remaining-tag">余步 --</span>
+                    <span data-field="remaining" class="remaining-tag">浣欐 --</span>
                 </div>
             </div>
 
             <div class="control-group">
-                <label>注射器型号</label>
+                <label>娉ㄥ皠鍣ㄥ瀷鍙?/label>
                 <div class="field-row">
                     <select class="syringe-select"></select>
-                    <span data-field="syringe-diam" class="switch">Ø -- mm</span>
+                    <span data-field="syringe-diam" class="switch">脴 -- mm</span>
                 </div>
             </div>
 
             <div class="control-group">
-                <label>速度</label>
+                <label>閫熷害</label>
                 <div class="field-row">
                     <input type="number" step="0.01" value="0.50" data-field="speed-value">
                     <select data-field="speed-unit">
@@ -93,24 +93,24 @@ function createPumpCards() {
                         <option value="mL/s">mL/s</option>
                         <option value="mm/s">mm/s</option>
                     </select>
-                    <button class="btn small-button" data-action="set-speed">设速度</button>
+                    <button class="btn small-button" data-action="set-speed">璁鹃€熷害</button>
                 </div>
             </div>
 
             <div class="control-group">
-                <label>加速度</label>
+                <label>鍔犻€熷害</label>
                 <div class="field-row">
                     <input type="number" step="0.01" value="5.0" data-field="accel-value">
                     <select data-field="accel-unit">
-                        <option value="mL/s²">mL/s²</option>
-                        <option value="mm/s²">mm/s²</option>
+                        <option value="mL/s虏">mL/s虏</option>
+                        <option value="mm/s虏">mm/s虏</option>
                     </select>
-                    <button class="btn small-button" data-action="set-accel">设加速度</button>
+                    <button class="btn small-button" data-action="set-accel">璁惧姞閫熷害</button>
                 </div>
             </div>
 
             <div class="control-group">
-                <label>体积/位移运行</label>
+                <label>浣撶Н/浣嶇Щ杩愯</label>
                 <div class="field-row">
                     <input type="number" step="0.001" value="1.000" data-field="run-value">
                     <select data-field="run-unit">
@@ -118,18 +118,18 @@ function createPumpCards() {
                         <option value="uL">uL</option>
                         <option value="mm">mm</option>
                     </select>
-                    <button class="btn small-button stretch" data-action="run">运行</button>
+                    <button class="btn small-button stretch" data-action="run">杩愯</button>
                 </div>
                 <div class="field-row">
-                    <button class="btn small-button" data-action="pause">暂停</button>
-                    <button class="btn small-button" data-action="stop">停止</button>
-                    <button class="btn small-button" data-action="resume">继续</button>
-                    <button class="btn small-button" data-action="zero">归零</button>
+                    <button class="btn small-button" data-action="pause">鏆傚仠</button>
+                    <button class="btn small-button" data-action="stop">鍋滄</button>
+                    <button class="btn small-button" data-action="resume">缁х画</button>
+                    <button class="btn small-button" data-action="zero">褰掗浂</button>
                 </div>
             </div>
 
             <div class="control-group">
-                <label>点动 (JOG)</label>
+                <label>鐐瑰姩 (JOG)</label>
                 <div class="field-row">
                     <input type="number" step="0.001" value="0.100" data-field="jog-value">
                     <select data-field="jog-unit">
@@ -137,51 +137,51 @@ function createPumpCards() {
                         <option value="uL">uL</option>
                         <option value="mm">mm</option>
                     </select>
-                    <button class="btn small-button" data-action="jog" data-direction="-1">◀︎</button>
-                    <button class="btn small-button" data-action="jog" data-direction="1">▶︎</button>
+                    <button class="btn small-button" data-action="jog" data-direction="-1">鈼€锔?/button>
+                    <button class="btn small-button" data-action="jog" data-direction="1">鈻讹笌</button>
                 </div>
                 <div class="jog-slider-wrap">
                     <input type="range" min="-1" max="1" step="0.05" value="0" data-field="jog-slider">
                     <div class="slider-labels">
-                        <span>反向</span>
-                        <span>归中</span>
-                        <span>正向</span>
+                        <span>鍙嶅悜</span>
+                        <span>褰掍腑</span>
+                        <span>姝ｅ悜</span>
                     </div>
                 </div>
             </div>
 
             <div class="control-group">
-                <label>步距校准</label>
+                <label>姝ヨ窛鏍″噯</label>
                 <div class="field-row">
                     <input type="number" step="0.001" min="0" data-field="steps-input" value="${DEFAULT_SPM.toFixed(3)}">
-                    <span class="switch">当前 <span data-field="steps-display">--</span> steps/mm</span>
+                    <span class="switch">褰撳墠 <span data-field="steps-display">--</span> steps/mm</span>
                 </div>
                 <div class="switch">
                     <input type="checkbox" data-field="invert-toggle" id="invert-${pid}">
-                    <label for="invert-${pid}">反向</label>
+                    <label for="invert-${pid}">鍙嶅悜</label>
                 </div>
                 <div class="field-row">
-                    <button class="btn small-button" data-action="set-steps">保存步距</button>
+                    <button class="btn small-button" data-action="set-steps">淇濆瓨姝ヨ窛</button>
                 </div>
             </div>
 
             <details>
-                <summary>校准向导</summary>
+                <summary>鏍″噯鍚戝</summary>
                 <div class="control-group">
-                    <label>行程校准</label>
+                    <label>琛岀▼鏍″噯</label>
                     <div class="field-row">
                         <input type="number" step="0.001" value="10.000" data-field="plan-mm">
                         <input type="number" step="0.001" value="10.000" data-field="meas-mm">
-                        <button class="btn small-button" data-action="apply-travel">计算修正</button>
+                        <button class="btn small-button" data-action="apply-travel">璁＄畻淇</button>
                     </div>
                 </div>
                 <div class="control-group">
-                    <label>体积闭环</label>
+                    <label>浣撶Н闂幆</label>
                     <div class="field-row">
                         <input type="number" step="0.001" value="1.000" data-field="plan-ml">
                         <input type="number" step="0.001" value="1.000" data-field="meas-ml">
                         <select data-field="cal-syringe"></select>
-                        <button class="btn small-button" data-action="apply-volume">体积修正</button>
+                        <button class="btn small-button" data-action="apply-volume">浣撶Н淇</button>
                     </div>
                 </div>
             </details>
@@ -230,12 +230,12 @@ function updateSyringeDiameter(card) {
     const label = card.querySelector('[data-field="syringe-diam"]');
     if (!select || !label) return;
     const model = state.syringes.find((s) => s.name === select.value);
-    label.textContent = model ? `Ø ${Number(model.inner_d_mm).toFixed(3)} mm` : "Ø -- mm";
+    label.textContent = model ? `脴 ${Number(model.inner_d_mm).toFixed(3)} mm` : "脴 -- mm";
 }
 
 function renderPorts() {
     const ports = state.ports;
-    const portOptions = ['<option value="">请选择串口</option>', ...ports.map((p) => `<option value="${p}">${p}</option>`)].join("");
+    const portOptions = ['<option value="">璇烽€夋嫨涓插彛</option>', ...ports.map((p) => `<option value="${p}">${p}</option>`)].join("");
     [0, 1].forEach((idx) => {
         const select = document.querySelector(`#port-select-${idx}`);
         if (!select) return;
@@ -253,7 +253,7 @@ function renderStatus() {
     const status = state.status;
     const connected = status?.boards?.some((b) => b.is_open) ?? false;
     const statusEl = document.querySelector("#connection-status");
-    statusEl.textContent = connected ? "串口已连接" : "未连接";
+    statusEl.textContent = connected ? "涓插彛宸茶繛鎺? : "鏈繛鎺?;
     statusEl.classList.toggle("status-connected", connected);
     statusEl.classList.toggle("status-disconnected", !connected);
 
@@ -262,22 +262,22 @@ function renderStatus() {
     status?.boards?.forEach((b) => {
         const elem = document.createElement("div");
         elem.className = `board-chip ${b.is_open ? "connected" : ""}`;
-        const label = b.index === 0 ? "主板" : "副板";
-        elem.textContent = `${label}: ${b.port || "未连接"}`;
+        const label = b.index === 0 ? "涓绘澘" : "鍓澘";
+        elem.textContent = `${label}: ${b.port || "鏈繛鎺?}`;
         boardStatus.appendChild(elem);
     });
 
     const ack = status?.ack ?? [];
     const ackSummary = document.querySelector("#ack-summary");
     ackSummary.textContent = ack.length
-        ? `剩余步数：${ack.map((v, i) => `${getPumpDisplayName(i + 1)}:${v}`).join(" / ")}`
+        ? `鍓╀綑姝ユ暟锛?{ack.map((v, i) => `${getPumpDisplayName(i + 1)}:${v}`).join(" / ")}`
         : "";
 
     document.querySelectorAll(".pump-card").forEach((card) => {
         const pid = Number(card.dataset.pump);
         const remaining = ack[pid - 1];
         const remEl = card.querySelector('[data-field="remaining"]');
-        if (remEl) remEl.textContent = Number.isFinite(remaining) ? `余步 ${remaining}` : "余步 --";
+        if (remEl) remEl.textContent = Number.isFinite(remaining) ? `浣欐 ${remaining}` : "浣欐 --";
         const cal = status?.calibration?.[pid];
         if (cal) {
             const steps = Number(cal.steps_per_mm) || 0;
@@ -298,20 +298,20 @@ function renderSyringeTable() {
     const tbody = document.querySelector("#syringe-table-body");
     tbody.innerHTML = "";
     if (!state.syringes.length) {
-        tbody.innerHTML = `<tr><td colspan="3" style="text-align:center;color:var(--muted);">暂无数据</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="3" style="text-align:center;color:var(--muted);">鏆傛棤鏁版嵁</td></tr>`;
         return;
     }
     state.syringes.forEach((model, idx) => {
         const row = document.createElement("tr");
         row.dataset.index = String(idx);
         row.innerHTML = `
-            <td><input type="text" data-field="syr-name" value="${model.name}" placeholder="型号名称"></td>
+            <td><input type="text" data-field="syr-name" value="${model.name}" placeholder="鍨嬪彿鍚嶇О"></td>
             <td><input type="number" step="0.001" min="0" data-field="syr-diam" value="${Number(model.inner_d_mm).toFixed(3)}"></td>
             <td>
                 <div class="row-actions">
-                    <button class="row-btn" data-action="syr-up">上移</button>
-                    <button class="row-btn" data-action="syr-down">下移</button>
-                    <button class="row-btn" data-action="syr-delete">删除</button>
+                    <button class="row-btn" data-action="syr-up">涓婄Щ</button>
+                    <button class="row-btn" data-action="syr-down">涓嬬Щ</button>
+                    <button class="row-btn" data-action="syr-delete">鍒犻櫎</button>
                 </div>
             </td>
         `;
@@ -320,6 +320,10 @@ function renderSyringeTable() {
 }
 
 async function refreshStatus() {
+    if (statusPollInFlight) {
+        return;
+    }
+    statusPollInFlight = true;
     try {
         const data = await apiGet("/api/status");
         state.status = data;
@@ -332,6 +336,8 @@ async function refreshStatus() {
         renderStatus();
     } catch (err) {
         showToast(`刷新状态失败：${err.message}`, "error", 3000);
+    } finally {
+        statusPollInFlight = false;
     }
 }
 
@@ -341,7 +347,7 @@ async function refreshPorts() {
         state.ports = data.ports || [];
         renderPorts();
     } catch (err) {
-        showToast(`刷新串口失败：${err.message}`, "error", 3000);
+        showToast(`鍒锋柊涓插彛澶辫触锛?{err.message}`, "error", 3000);
     }
 }
 
@@ -352,7 +358,7 @@ async function refreshSyringes() {
         renderSyringeTable();
         updateSyringeSelects();
     } catch (err) {
-        showToast(`读取注射器列表失败：${err.message}`, "error", 3000);
+        showToast(`璇诲彇娉ㄥ皠鍣ㄥ垪琛ㄥけ璐ワ細${err.message}`, "error", 3000);
     }
 }
 
@@ -360,28 +366,28 @@ async function connectBoard(idx) {
     const port = document.querySelector(`#port-select-${idx}`)?.value;
     const baud = Number(document.querySelector(`#baud-select-${idx}`)?.value || "230400");
     if (!port) {
-        showToast("请选择串口", "error");
+        showToast("璇烽€夋嫨涓插彛", "error");
         return;
     }
     await apiPost("/api/boards/open", { board_index: idx, port, baud });
-    showToast(`${idx === 0 ? "主板" : "副板"}连接成功`, "success");
+    showToast(`${idx === 0 ? "涓绘澘" : "鍓澘"}杩炴帴鎴愬姛`, "success");
     await refreshStatus();
 }
 
 async function closeAllBoards() {
     await apiPost("/api/boards/close-all");
-    showToast("串口已断开", "success");
+    showToast("涓插彛宸叉柇寮€", "success");
     await refreshStatus();
 }
 
 async function zeroAll() {
     await apiPost("/api/boards/zero");
-    showToast("已发送置零命令", "info");
+    showToast("宸插彂閫佺疆闆跺懡浠?, "info");
 }
 
 async function estopAll() {
     await apiPost("/api/boards/estop");
-    showToast("已发送紧急停止", "error");
+    showToast("宸插彂閫佺揣鎬ュ仠姝?, "error");
 }
 
 async function handlePumpAction(card, action, target) {
@@ -392,38 +398,38 @@ async function handlePumpAction(card, action, target) {
                 const value = Number(card.querySelector('[data-field="speed-value"]')?.value || "0");
                 const unit = card.querySelector('[data-field="speed-unit"]')?.value;
                 await apiPost(`/api/pumps/${pumpId}/speed`, { value, unit });
-                showToast(`${getPumpDisplayName(pumpId)} 速度已更新`, "success");
+                showToast(`${getPumpDisplayName(pumpId)} 閫熷害宸叉洿鏂癭, "success");
                 break;
             }
             case "set-accel": {
                 const value = Number(card.querySelector('[data-field="accel-value"]')?.value || "0");
                 const unit = card.querySelector('[data-field="accel-unit"]')?.value;
                 await apiPost(`/api/pumps/${pumpId}/accel`, { value, unit });
-                showToast(`${getPumpDisplayName(pumpId)} 加速度已更新`, "success");
+                showToast(`${getPumpDisplayName(pumpId)} 鍔犻€熷害宸叉洿鏂癭, "success");
                 break;
             }
             case "run": {
                 const value = Number(card.querySelector('[data-field="run-value"]')?.value || "0");
                 const unit = card.querySelector('[data-field="run-unit"]')?.value;
                 await apiPost(`/api/pumps/${pumpId}/run`, { value, unit });
-                showToast(`${getPumpDisplayName(pumpId)} 已开始运行`, "info");
+                showToast(`${getPumpDisplayName(pumpId)} 宸插紑濮嬭繍琛宍, "info");
                 break;
             }
             case "pause":
                 await apiPost(`/api/pumps/${pumpId}/pause`);
-                showToast(`${getPumpDisplayName(pumpId)} 已暂停`, "info");
+                showToast(`${getPumpDisplayName(pumpId)} 宸叉殏鍋渀, "info");
                 break;
             case "stop":
                 await apiPost(`/api/pumps/${pumpId}/stop`);
-                showToast(`${getPumpDisplayName(pumpId)} 已停止`, "info");
+                showToast(`${getPumpDisplayName(pumpId)} 宸插仠姝, "info");
                 break;
             case "resume":
                 await apiPost(`/api/pumps/${pumpId}/resume`);
-                showToast(`${getPumpDisplayName(pumpId)} 已继续`, "info");
+                showToast(`${getPumpDisplayName(pumpId)} 宸茬户缁璥, "info");
                 break;
             case "zero":
                 await apiPost(`/api/pumps/${pumpId}/zero`);
-                showToast(`${getPumpDisplayName(pumpId)} 已归零`, "success");
+                showToast(`${getPumpDisplayName(pumpId)} 宸插綊闆禶, "success");
                 await refreshStatus();
                 break;
             case "jog": {
@@ -431,13 +437,13 @@ async function handlePumpAction(card, action, target) {
                 const unit = card.querySelector('[data-field="jog-unit"]')?.value;
                 const direction = Number(target.dataset.direction || "1");
                 await apiPost(`/api/pumps/${pumpId}/jog`, { delta: direction * base, unit });
-                showToast(`${getPumpDisplayName(pumpId)} 点动已发送`, "info");
+                showToast(`${getPumpDisplayName(pumpId)} 鐐瑰姩宸插彂閫乣, "info");
                 break;
             }
             case "set-steps": {
                 const steps = Number(card.querySelector('[data-field="steps-input"]')?.value || "0");
                 await apiPost(`/api/calibration/${pumpId}/steps`, { steps_per_mm: steps });
-                showToast(`${getPumpDisplayName(pumpId)} 步距已保存`, "success");
+                showToast(`${getPumpDisplayName(pumpId)} 姝ヨ窛宸蹭繚瀛榒, "success");
                 await refreshStatus();
                 break;
             }
@@ -445,7 +451,7 @@ async function handlePumpAction(card, action, target) {
                 const plan = Number(card.querySelector('[data-field="plan-mm"]')?.value || "0");
                 const meas = Number(card.querySelector('[data-field="meas-mm"]')?.value || "0");
                 const res = await apiPost(`/api/calibration/${pumpId}/travel`, { plan_mm: plan, meas_mm: meas });
-                showToast(`${getPumpDisplayName(pumpId)} 行程修正: ${Number(res.steps_per_mm).toFixed(3)}`, "success");
+                showToast(`${getPumpDisplayName(pumpId)} 琛岀▼淇: ${Number(res.steps_per_mm).toFixed(3)}`, "success");
                 await refreshStatus();
                 break;
             }
@@ -458,13 +464,13 @@ async function handlePumpAction(card, action, target) {
                     meas_ml: measMl,
                     syringe_name: syringe,
                 });
-                showToast(`${getPumpDisplayName(pumpId)} 体积修正: ${Number(res.steps_per_mm).toFixed(3)}`, "success");
+                showToast(`${getPumpDisplayName(pumpId)} 浣撶Н淇: ${Number(res.steps_per_mm).toFixed(3)}`, "success");
                 await refreshStatus();
                 break;
             }
             case "rename": {
                 const current = getPumpDisplayName(pumpId);
-                const value = window.prompt("输入新的泵名称：", current);
+                const value = window.prompt("杈撳叆鏂扮殑娉靛悕绉帮細", current);
                 if (value === null) break;
                 const trimmed = value.trim();
                 if (!trimmed) {
@@ -474,14 +480,14 @@ async function handlePumpAction(card, action, target) {
                 await apiPost(`/api/pumps/${pumpId}/name`, { name: trimmed });
                 state.pumpNames[pumpId] = trimmed;
                 updatePumpNameElements();
-                showToast(`名称已更新为 ${trimmed}`, "success");
+                showToast(`鍚嶇О宸叉洿鏂颁负 ${trimmed}`, "success");
                 break;
             }
             default:
                 break;
         }
     } catch (err) {
-        showToast(`操作失败：${err.message}`, "error", 3200);
+        showToast(`鎿嶄綔澶辫触锛?{err.message}`, "error", 3200);
     }
 }
 
@@ -489,9 +495,9 @@ async function saveInvert(card, invert) {
     const pumpId = Number(card.dataset.pump);
     try {
         await apiPost(`/api/calibration/${pumpId}/invert`, { invert });
-        showToast(`${getPumpDisplayName(pumpId)} 方向已更新`, "success");
+        showToast(`${getPumpDisplayName(pumpId)} 鏂瑰悜宸叉洿鏂癭, "success");
     } catch (err) {
-        showToast(`更新方向失败：${err.message}`, "error", 3200);
+        showToast(`鏇存柊鏂瑰悜澶辫触锛?{err.message}`, "error", 3200);
         const toggle = card.querySelector('[data-field="invert-toggle"]');
         if (toggle) toggle.checked = !invert;
     }
@@ -628,7 +634,7 @@ async function init() {
     });
 
     await Promise.all([refreshPorts(), refreshSyringes(), refreshStatus()]);
-    setInterval(refreshStatus, 2000);
+    setInterval(refreshStatus, STATUS_INTERVAL_MS);
     setInterval(refreshPorts, 12000);
 }
 
@@ -638,3 +644,4 @@ document.addEventListener("DOMContentLoaded", () => {
         showToast(`初始化失败：${err.message}`, "error", 5000);
     });
 });
+

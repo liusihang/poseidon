@@ -122,27 +122,30 @@ class PoseidonService:
     # ----------- Status snapshots -----------
     def status(self) -> Dict[str, object]:
         with self._lock:
-            boards = []
-            for idx, link in enumerate(self._backend.ctrl.links):
-                ser = getattr(link, "_ser", None)
-                boards.append(
-                    {
-                        "index": idx,
-                        "port": getattr(link, "port_name", ""),
-                        "baud": getattr(link, "baud", DEFAULT_BAUD),
-                        "is_open": bool(getattr(ser, "is_open", False)),
-                    }
-                )
-            calib = {
-                pump_id: {
-                    "steps_per_mm": cal.steps_per_mm,
-                    "invert_dir": cal.invert_dir,
-                }
-                for pump_id, cal in self._backend.calib.by_pump.items()
-            }
-            syringes = [asdict(model) for model in self._backend.syr.models]
+            links = list(self._backend.ctrl.links)
+            calib_map = {pid: self._backend.calib.by_pump[pid] for pid in (1, 2, 3, 4)}
+            syr_models = list(self._backend.syr.models)
             ack = self._backend.ctrl.last_d2g()
             names = {i: self._backend.pump_names.get(i) for i in (1, 2, 3, 4)}
+        boards = []
+        for idx, link in enumerate(links):
+            ser = getattr(link, "_ser", None)
+            boards.append(
+                {
+                    "index": idx,
+                    "port": getattr(link, "port_name", ""),
+                    "baud": getattr(link, "baud", DEFAULT_BAUD),
+                    "is_open": bool(getattr(ser, "is_open", False)),
+                }
+            )
+        calib = {
+            pid: {
+                "steps_per_mm": cal.steps_per_mm,
+                "invert_dir": cal.invert_dir,
+            }
+            for pid, cal in calib_map.items()
+        }
+        syringes = [asdict(model) for model in syr_models]
         return {
             "boards": boards,
             "calibration": calib,
@@ -150,6 +153,7 @@ class PoseidonService:
             "ack": ack,
             "pump_names": names,
         }
+
 
 
 # Shared singleton so uvicorn workers reuse hardware connection logic.
