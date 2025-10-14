@@ -8,8 +8,10 @@
 const API_BASE = "";
 const DEFAULT_SPM = 800.0;
 const JOG_SLIDER_THRESHOLD = 0.05;
+const STATUS_INTERVAL_MS = 1500;
 
 const pumpGrid = document.querySelector("#pump-grid");
+let statusPollInFlight = false;
 
 async function apiRequest(path, { method = "GET", body } = {}) {
     const opts = { method, headers: {} };
@@ -90,6 +92,7 @@ function createPumpCards() {
                     <input type="number" step="0.01" value="0.50" data-field="speed-value">
                     <select data-field="speed-unit">
                         <option value="mL/min">mL/min</option>
+                        <option value="uL/min">uL/min</option>
                         <option value="mL/s">mL/s</option>
                         <option value="mm/s">mm/s</option>
                     </select>

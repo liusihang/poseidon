@@ -1,24 +1,5 @@
-/*
-  Poseidon Pumps — CSV frame firmware (UNO + CNC Shield v3)
-
-  协议示例：
-    <SETTING,SPEED,1,1200,F,0,0,0>
-    <SETTING,ACCEL,2,4000,F,0,0,0>
-    <SETTING,DELTA,1,800,F,0,0,0>
-    <RUN,DIST,13,0.0,F,4000,0,4000,0>
-    <STOP,BLAH,123,BLAH,F,0,0,0,0>
-    <PAUSE,BLAH,12,BLAH,F,0,0,0,0>
-    <RESUME,BLAH,12,BLAH,F,0,0,0,0>
-    <ZERO,BLAH,BLAH,BLAH,F,0,0,0,0>
-
-  每条命令即时回 ACK：
-    <p1_d2g,p2_d2g,p3_d2g,p4_d2g>
-
-  两板分工：
-    BOARD_ROLE_PRIMARY=1: P1->X, P2->Y；忽略 P3/P4
-    BOARD_ROLE_PRIMARY=0: P3->X, P4->Y；忽略 P1/P2
-*/
 #include <AccelStepper.h>
+#include <TMC2209Stepper.h>  // 引入 TMC2209 驱动库
 #include <string.h>
 #include <stdlib.h>
 
@@ -34,7 +15,15 @@
 #define Z_STP    4
 #define Z_DIR    7
 
-#define BAUD_RATE 115200
+// TMC2209 驱动控制引脚
+#define DIR_PIN   5
+#define STEP_PIN  2
+#define ENABLE_PIN 8
+#define SERIAL_PORT  Serial1  // 使用 Serial1，适应 TMC2209 的 UART 通信
+
+#define R_SENSE 0.11f // TMC2209 的电流感应电阻（根据具体模块调整）
+
+#define BAUD_RATE 230400  // 更改波特率为 230400
 
 // =================== 运动默认参数（保守稳健）=============
 #define DEFAULT_VMAX   400.0f   // steps/s
@@ -50,10 +39,18 @@ static uint32_t lastMotionMs  = 0;
 static uint32_t lastStatMs    = 0;
 static bool     prevActive    = false;
 
+// TMC2209 驱动器实例化
+TMC2209Stepper driver(&SERIAL_PORT, R_SENSE);  // 使用 UART 连接 TMC2209
+
 // 统一的驱动使能控制（低电平=上电使能）
 static inline void enableDrivers(bool on){
-  digitalWrite(EN_PIN, on ? LOW : HIGH);
-  driversOn = on;
+  if (on) {
+    digitalWrite(ENABLE_PIN, LOW);  // 使能驱动
+    driversOn = true;
+  } else {
+    digitalWrite(ENABLE_PIN, HIGH); // 断开驱动
+    driversOn = false;
+  }
 }
 
 // =================== 电机对象 ============================
@@ -183,7 +180,6 @@ void exec_RESUME(uint8_t /*pumpsMask*/){
 }
 
 // =================== CSV 解析与分派 =======================
-// 形如：<MODE,SETTING,PU,VAL,DIR,P1,P2,P3,P4>
 void parseAndExec(char* buf){
   const int MAXT=12;
   char* tok[MAXT]; int n=0;
@@ -224,7 +220,7 @@ void parseAndExec(char* buf){
 
 // =================== Arduino 入口 =========================
 void setup(){
-  Serial.begin(BAUD_RATE);
+  SERIAL_PORT.begin(BAUD_RATE);  // 使用新的波特率 230400
   pinMode(EN_PIN, OUTPUT);
   enableDrivers(false);               // 上电默认失能（安全）
 
@@ -236,7 +232,7 @@ void setup(){
 
   pinMode(LED_BUILTIN, OUTPUT);
   for (int i=0;i<3;++i){ digitalWrite(LED_BUILTIN,HIGH); delay(80); digitalWrite(LED_BUILTIN,LOW); delay(80); }
-  Serial.println(F("FW READY (CSV,115200)")); // 与 BAUD_RATE 一致
+  Serial.println(F("FW READY (CSV,230400)")); // 显示新波特率
 
   lastMotionMs = millis();
   lastStatMs   = millis();

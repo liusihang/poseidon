@@ -112,7 +112,7 @@ class SpeedRequest(BaseModel):
 
     @validator("unit")
     def _validate_unit(cls, v: str) -> str:
-        allowed = {"mm/s", "mL/s", "mL/min"}
+        allowed = {"mm/s", "mL/s", "mL/min", "uL/min"}
         if v not in allowed:
             raise ValueError(f"unit must be one of {sorted(allowed)}")
         return v
