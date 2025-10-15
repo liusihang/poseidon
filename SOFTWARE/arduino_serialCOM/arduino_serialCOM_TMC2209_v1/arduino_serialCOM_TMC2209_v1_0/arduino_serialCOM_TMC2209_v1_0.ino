@@ -1,80 +1,82 @@
+/*
+  Poseidon Pumps — CSV frame firmware (UNO + CNC Shield v3, TMC2209 STEP/DIR, no UART)
+  本版：ROLE=SECONDARY 时，将 P4 映射到 Z 轴（Z_STEP=D4, Z_DIR=D7）
+
+  协议（同前）：
+    <SETTING,SPEED,1,1200,F,0,0,0>
+    <SETTING,ACCEL,2,4000,F,0,0,0>
+    <SETTING,DELTA,1,800,F,0,0,0>
+    <RUN,DIST,13,0.0,F,4000,0,4000,0>
+    <STOP,BLAH,123,BLAH,F,0,0,0,0>
+    <PAUSE,BLAH,12,BLAH,F,0,0,0,0>
+    <RESUME,BLAH,12,BLAH,F,0,0,0,0>
+    <ZERO,BLAH,BLAH,BLAH,F,0,0,0,0>
+
+  ACK（余步）：
+    <p1_d2g,p2_d2g,p3_d2g,p4_d2g>
+*/
 #include <AccelStepper.h>
-#include <TMC2209Stepper.h>  // 引入 TMC2209 驱动库
 #include <string.h>
 #include <stdlib.h>
 
-// =================== 角色选择（主/副板）===================
-#define BOARD_ROLE_PRIMARY 1  // 1=主板(P1/P2)；0=副板(P3/P4)
+// ===== 角色选择 =====
+#define BOARD_ROLE_PRIMARY 0   // ★ 本版默认副板：0=SECONDARY(P3/P4)，1=PRIMARY(P1/P2)
 
-// =================== 引脚映射（UNO + CNC Shield v3）======
-#define EN_PIN   8   // 低电平使能
+// ===== 引脚映射（UNO + CNC Shield v3）=====
+#define EN_PIN   8   // 低电平使能（TMC2209 ENN）
 #define X_STP    2
 #define X_DIR    5
 #define Y_STP    3
 #define Y_DIR    6
-#define Z_STP    4
-#define Z_DIR    7
+#define Z_STP    4   // ★ 将 P4 切换到 Z：STEP=D4
+#define Z_DIR    7   // ★ 将 P4 切换到 Z：DIR =D7
 
-// TMC2209 驱动控制引脚
-#define DIR_PIN   5
-#define STEP_PIN  2
-#define ENABLE_PIN 8
-#define SERIAL_PORT  Serial1  // 使用 Serial1，适应 TMC2209 的 UART 通信
+// ===== 串口波特率 =====
+#define BAUD_RATE 230400
 
-#define R_SENSE 0.11f // TMC2209 的电流感应电阻（根据具体模块调整）
+// ===== 运动默认参数（步/秒、步/秒²）=====
+#define DEFAULT_VMAX   500.0f
+#define DEFAULT_ACCEL  500.0f
 
-#define BAUD_RATE 230400  // 更改波特率为 230400
+// ===== TMC2209 STEP 时序 =====
+#define MIN_PULSE_US   3   // 安全 3us 脉宽
 
-// =================== 运动默认参数（保守稳健）=============
-#define DEFAULT_VMAX   400.0f   // steps/s
-#define DEFAULT_ACCEL  300.0f   // steps/s^2
-#define MIN_PULSE_US   2        // DRV8825 ≥1.9us
-
-// =================== 主动状态上报/空闲断电参数 ============
-#define STAT_INTERVAL_MS 200    // 5 Hz 主动上报余步
-#define IDLE_DISABLE_MS  500    // 静止超过该时间自动断使能
+// ===== 主动上报/空闲断能 =====
+#define STAT_INTERVAL_MS 200
+#define IDLE_DISABLE_MS  500
 
 static bool     driversOn     = false;
 static uint32_t lastMotionMs  = 0;
 static uint32_t lastStatMs    = 0;
 static bool     prevActive    = false;
 
-// TMC2209 驱动器实例化
-TMC2209Stepper driver(&SERIAL_PORT, R_SENSE);  // 使用 UART 连接 TMC2209
-
-// 统一的驱动使能控制（低电平=上电使能）
 static inline void enableDrivers(bool on){
-  if (on) {
-    digitalWrite(ENABLE_PIN, LOW);  // 使能驱动
-    driversOn = true;
-  } else {
-    digitalWrite(ENABLE_PIN, HIGH); // 断开驱动
-    driversOn = false;
-  }
+  digitalWrite(EN_PIN, on ? LOW : HIGH);
+  driversOn = on;
 }
 
-// =================== 电机对象 ============================
+// ===== 电机对象 =====
 AccelStepper stepperX(AccelStepper::DRIVER, X_STP, X_DIR);
 AccelStepper stepperY(AccelStepper::DRIVER, Y_STP, Y_DIR);
-AccelStepper stepperZ(AccelStepper::DRIVER, Z_STP, Z_DIR); // 预留
+AccelStepper stepperZ(AccelStepper::DRIVER, Z_STP, Z_DIR);
 AccelStepper* S[3] = { &stepperX, &stepperY, &stepperZ };  // 0:X 1:Y 2:Z
 
-// =================== 串口帧缓冲 ==========================
+// ===== 串口帧缓冲 =====
 static const int BUF_SZ = 128;
 char frameBuf[BUF_SZ];
 int  frameLen = 0;
 bool inFrame  = false;
 
-// =================== 小工具 ===============================
+// ===== 工具函数 =====
 static inline long d2gPump(int pump){
 #if BOARD_ROLE_PRIMARY
   if (pump==1) return stepperX.distanceToGo();
   if (pump==2) return stepperY.distanceToGo();
-  return 0; // 忽略 P3/P4
+  return 0;
 #else
-  if (pump==3) return stepperX.distanceToGo();
-  if (pump==4) return stepperY.distanceToGo();
-  return 0; // 忽略 P1/P2
+  if (pump==3) return stepperX.distanceToGo(); // SECONDARY: P3->X
+  if (pump==4) return stepperZ.distanceToGo(); // SECONDARY: P4->Z ★
+  return 0;
 #endif
 }
 
@@ -86,7 +88,6 @@ static inline void replyD2G(){
   Serial.print(d2gPump(4)); Serial.print('>');
 }
 
-// 解析 pumps 字符串为位掩码，例如 "13" -> bit0、bit2 置位
 uint8_t parsePumpsMask(const char* s){
   uint8_t m=0;
   for (const char* p=s; *p; ++p){
@@ -98,20 +99,27 @@ uint8_t parsePumpsMask(const char* s){
   return m;
 }
 
-// pump 编号→本板实际轴；不在本板的返回 nullptr
 AccelStepper* axisOfPump(int pump){
 #if BOARD_ROLE_PRIMARY
   if (pump==1) return &stepperX;
   if (pump==2) return &stepperY;
   return nullptr;
 #else
-  if (pump==3) return &stepperX;
-  if (pump==4) return &stepperY;
+  if (pump==3) return &stepperX; // P3->X
+  if (pump==4) return &stepperZ; // P4->Z ★
   return nullptr;
 #endif
 }
 
-// =================== 执行器 ===============================
+// 去空白+转大写，取首字符（保证 DIR 稳定解析）
+static inline char firstNonSpaceUpper(const char* s){
+  while (*s==' ' || *s=='\t') ++s;
+  char c = *s ? *s : 'F';
+  if (c>='a' && c<='z') c -= 32;
+  return c;
+}
+
+// ===== 执行器 =====
 void exec_SETTING_SPEED(uint8_t pumpsMask, float v){
   if (v<=0) v=DEFAULT_VMAX;
   for (int p=1; p<=4; ++p){
@@ -140,17 +148,14 @@ void exec_SETTING_DELTA(uint8_t /*pumpsMask*/, float /*delta*/){
 
 void exec_RUN_DIST(uint8_t pumpsMask, char dir, long p1,long p2,long p3,long p4){
   long arr[4] = {p1,p2,p3,p4};
-  int  sign   = (dir=='B')? -1 : 1;
-
-  // 开始运动：上电
+  int  sign0  = (dir=='B')? -1 : 1;
   enableDrivers(true);
-
   for (int p=1; p<=4; ++p){
     if (!(pumpsMask & (1<<(p-1)))) continue;
     AccelStepper* a = axisOfPump(p);
     if (!a) continue;
-    long rel = sign * arr[p-1];
-    a->move(rel);  // 非阻塞；loop() 推进
+    long rel = sign0 * arr[p-1];
+    a->move(rel);
   }
   replyD2G();
 }
@@ -160,7 +165,7 @@ void exec_STOP(uint8_t pumpsMask){
     if (!(pumpsMask & (1<<(p-1)))) continue;
     AccelStepper* a = axisOfPump(p);
     if (!a) continue;
-    a->stop();      // 按加速度平滑停
+    a->stop();
   }
   replyD2G();
 }
@@ -168,18 +173,15 @@ void exec_STOP(uint8_t pumpsMask){
 void exec_ZERO(){
   stepperX.setCurrentPosition(0);
   stepperY.setCurrentPosition(0);
+  stepperZ.setCurrentPosition(0); // ★ 一并清零，兼容 P4->Z
   replyD2G();
 }
 
-void exec_PAUSE(uint8_t pumpsMask){
-  exec_STOP(pumpsMask);
-}
+// PAUSE 等价 STOP；RESUME 仅 ACK
+void exec_PAUSE(uint8_t pumpsMask){ exec_STOP(pumpsMask); }
+void exec_RESUME(uint8_t /*pumpsMask*/){ replyD2G(); }
 
-void exec_RESUME(uint8_t /*pumpsMask*/){
-  replyD2G();
-}
-
-// =================== CSV 解析与分派 =======================
+// ===== 解析与分派 =====
 void parseAndExec(char* buf){
   const int MAXT=12;
   char* tok[MAXT]; int n=0;
@@ -197,7 +199,7 @@ void parseAndExec(char* buf){
   const char* PUMPS = (n>2)? tok[2] : "0";
   uint8_t pumpsMask = parsePumpsMask(PUMPS);
   float   VAL   = (n>3)? atof(tok[3]) : 0.0f;
-  char    DIR   = (n>4 && tok[4] && tok[4][0]) ? tok[4][0] : 'F';
+  char    DIR   = (n>4 && tok[4]) ? firstNonSpaceUpper(tok[4]) : 'F';
   long    PVAL[4]={0,0,0,0};
   if (n>5) PVAL[0]=atol(tok[5]);
   if (n>6) PVAL[1]=atol(tok[6]);
@@ -218,11 +220,11 @@ void parseAndExec(char* buf){
   replyD2G();
 }
 
-// =================== Arduino 入口 =========================
+// ===== Arduino 入口 =====
 void setup(){
-  SERIAL_PORT.begin(BAUD_RATE);  // 使用新的波特率 230400
+  Serial.begin(BAUD_RATE);
   pinMode(EN_PIN, OUTPUT);
-  enableDrivers(false);               // 上电默认失能（安全）
+  enableDrivers(false);
 
   for (int i=0;i<3;++i){
     S[i]->setMaxSpeed(DEFAULT_VMAX);
@@ -232,7 +234,11 @@ void setup(){
 
   pinMode(LED_BUILTIN, OUTPUT);
   for (int i=0;i<3;++i){ digitalWrite(LED_BUILTIN,HIGH); delay(80); digitalWrite(LED_BUILTIN,LOW); delay(80); }
-  Serial.println(F("FW READY (CSV,230400)")); // 显示新波特率
+#if BOARD_ROLE_PRIMARY
+  Serial.println(F("FW READY (CSV,230400,TMC2209-STEP/DIR,ROLE=PRIMARY P1->X,P2->Y)"));
+#else
+  Serial.println(F("FW READY (CSV,230400,TMC2209-STEP/DIR,ROLE=SECONDARY P3->X,P4->Z)"));
+#endif
 
   lastMotionMs = millis();
   lastStatMs   = millis();
@@ -240,43 +246,30 @@ void setup(){
 }
 
 void loop(){
-  // 推进电机（非阻塞）
+  // 推进
   stepperX.run();
   stepperY.run();
   stepperZ.run();
 
-  // === 是否有运动 ===
   bool active = false;
   if (stepperX.distanceToGo() != 0 || stepperX.speed() != 0.0f) active = true;
   if (stepperY.distanceToGo() != 0 || stepperY.speed() != 0.0f) active = true;
   if (stepperZ.distanceToGo() != 0 || stepperZ.speed() != 0.0f) active = true;
 
   uint32_t now = millis();
-
   if (active) {
     lastMotionMs = now;
-
-    // 5 Hz 主动上报
     if (now - lastStatMs >= STAT_INTERVAL_MS) {
       replyD2G();
       lastStatMs = now;
     }
-
   } else {
-    // 由运动->静止：立即上报一次（确保归零及时）
-    if (prevActive) {
-      replyD2G();
-      lastStatMs = now;
-    }
-    // 静止超过阈值后自动断使能
-    if (driversOn && (now - lastMotionMs) >= IDLE_DISABLE_MS) {
-      enableDrivers(false);
-    }
+    if (prevActive) { replyD2G(); lastStatMs = now; }
+    if (driversOn && (now - lastMotionMs) >= IDLE_DISABLE_MS) enableDrivers(false);
   }
-
   prevActive = active;
 
-  // 串口接收状态机
+  // 串口接收
   while (Serial.available()>0){
     char c = Serial.read();
     if (!inFrame){

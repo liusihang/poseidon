@@ -234,7 +234,7 @@ function updateSyringeDiameter(card) {
     const label = card.querySelector('[data-field="syringe-diam"]');
     if (!select || !label) return;
     const model = state.syringes.find((s) => s.name === select.value);
-    label.textContent = model ? `脴 ${Number(model.inner_d_mm).toFixed(3)} mm` : "脴 -- mm";
+    label.textContent = model ? `内径 ${Number(model.inner_d_mm).toFixed(3)} mm` : "内径 -- mm";
 }
 
 function renderPorts() {
@@ -304,20 +304,20 @@ function renderSyringeTable() {
     const tbody = document.querySelector("#syringe-table-body");
     tbody.innerHTML = "";
     if (!state.syringes.length) {
-        tbody.innerHTML = `<tr><td colspan="3" style="text-align:center;color:var(--muted);">鏆傛棤鏁版嵁</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="3" style="text-align:center;color:var(--muted);">暂无数据</td></tr>`;
         return;
     }
     state.syringes.forEach((model, idx) => {
         const row = document.createElement("tr");
         row.dataset.index = String(idx);
         row.innerHTML = `
-            <td><input type="text" data-field="syr-name" value="${model.name}" placeholder="鍨嬪彿鍚嶇О"></td>
+            <td><input type="text" data-field="syr-name" value="${model.name}" placeholder="型号名称"></td>
             <td><input type="number" step="0.001" min="0" data-field="syr-diam" value="${Number(model.inner_d_mm).toFixed(3)}"></td>
             <td>
                 <div class="row-actions">
-                    <button class="row-btn" data-action="syr-up">涓婄Щ</button>
-                    <button class="row-btn" data-action="syr-down">涓嬬Щ</button>
-                    <button class="row-btn" data-action="syr-delete">鍒犻櫎</button>
+                    <button class="row-btn" data-action="syr-up">上移</button>
+                    <button class="row-btn" data-action="syr-down">下移</button>
+                    <button class="row-btn" data-action="syr-delete">删除</button>
                 </div>
             </td>
         `;
